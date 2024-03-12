@@ -7,7 +7,7 @@ lsx() {
         exit 2
     else
         echo "$1"
-        p=$(./main $1)
+        p=$($HOME/.lsx/main $1)
         cd $p
     fi
 }
