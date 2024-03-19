@@ -8,7 +8,7 @@ lsx() {
     fi
 
     echo "$LSX_CD_PATH"
-    LSX_FOUND_PATH=$($HOME/.lsx/main $LSX_CD_PATH)
+    LSX_FOUND_PATH=$($HOME/.lsx/lsx $LSX_CD_PATH)
 
     # check that lsx bin exited with 0 as error code
 
