@@ -5,12 +5,47 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"os/exec"
+	"os/signal"
 	"path"
+	"strings"
 	"syscall"
+
+	"github.com/micaiah-effiong/lsx/terminal"
 )
 
+func re_run(tm terminal.Terminal_reader, ls_name_list []string, pos int) string {
+
+	render_list(ls_name_list, pos)
+	k, err := tm.Reader()
+	if err != nil {
+		panic(err)
+	}
+
+	clear()
+
+	// fmt.Println(k.To_string())
+
+	if k.PayloadByte == 10 {
+		return ls_name_list[pos]
+	}
+
+	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(ls_name_list)-1)
+
+	return re_run(tm, ls_name_list, new_pos)
+}
+
+// func main() {
+// 	tm := terminal.TerminalReader{}
+//
+// 	k, _ := tm.Reader()
+//
+// 	fmt.Println(k.ToStrint())
+// }
+
 func main() {
+
+	handle_termination()
+
 	flag.Parse()
 	args := flag.Args()
 
@@ -26,16 +61,16 @@ func main() {
 		first_arg = args[0]
 	}
 
-	if first_arg == "~" {
-		home_dir, err := os.Hostname()
-		if err != nil {
-			print(err)
-			print("Error getting user home directory")
-			// panic("An error occurred while reading directory")
-		}
-
-		first_arg = home_dir
-	}
+	// if first_arg == "~" {
+	// 	home_dir, err := os.UserHomeDir()
+	// 	if err != nil {
+	// 		print(err)
+	// 		print("Error getting user home directory")
+	// 		// panic("An error occurred while reading directory")
+	// 	}
+	//
+	// 	first_arg = home_dir
+	// }
 
 	_fs := os.DirFS(first_arg)
 	ls, err := fs.ReadDir(_fs, ".")
@@ -51,156 +86,102 @@ func main() {
 	pos := 0
 	var ls_name_list []string
 
-	for _, line := range ls {
-		line_name := line.Name()
-		if string(line_name[0]) == "." {
+	for _, dir_list_item := range ls {
+		info, err := dir_list_item.Info()
+
+		if err != nil {
 			continue
 		}
-		ls_name_list = append(ls_name_list, line.Name())
-	}
 
-	render_list(ls_name_list, pos)
-
-	// disable input buffering
-	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	// do not display entered characters on the screen
-	exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
-
-	var b []byte = make([]byte, 1)
-	var command_modifier_byte []byte
-	for {
-		os.Stdin.Read(b)
-
-		if b[0] == 10 {
-
-			cwd, err := syscall.Getwd()
-			if err != nil {
-				log.Fatal(err)
-				panic("Failed to get working directory")
-			}
-
-			joined_path := path.Join(cwd, first_arg, ls_name_list[pos])
-			// println(joined_path, cwd, first_arg, ls_name_list[pos])
-			// println(joined_path)
-
-			clear()
-
-			os.Stdout.Write([]byte(joined_path))
-
-			// err = syscall.Chdir(joined_path)
-			//
-			// if err != nil {
-			// 	log.Fatal(err)
-			// 	panic("Failed to get change directory")
-			// }
-
-			os.Exit(0)
-			return
+		if strings.HasPrefix(info.Name(), ".") {
+			continue
 		}
 
-		// if len(command_modifier_byte) > 0 && command_modifier_byte[0] == 27 {
-		// 	continue
+		var name string
+		// if info.IsDir() {
+		// 	name = "\033[38;5;112m" + info.Name() + "\033[38;5;231m"
+		// } else {
+		name = dir_list_item.Name()
 		// }
 
-		// ESC
-		if b[0] == 27 {
-			command_modifier_byte = nil
-			command_modifier_byte = append(command_modifier_byte, b[0])
-		}
-
-		var key_string string
-		if len(command_modifier_byte) > 0 && b[0] != 27 {
-			command_modifier_byte = append(command_modifier_byte, b[0])
-		}
-
-		if len(command_modifier_byte) == 3 {
-			k, valid := nice_bytes(command_modifier_byte)
-
-			if valid {
-				key_string = k
-				pos += get_nice_key_val(k)
-				command_modifier_byte = nil
-			} else {
-				println("Invalid", string(command_modifier_byte))
-			}
-		}
-
-		if b[0] != 27 && len(command_modifier_byte) < 1 && len(key_string) < 1 {
-			key_string = string(b[0])
-		}
-
-		if len(key_string) > 0 {
-			clear()
-			render_list(ls_name_list, pos)
-		}
-
+		ls_name_list = append(ls_name_list, name)
 	}
+
+	tm := terminal.Terminal_reader{}
+
+	hide_cursor()
+	clear()
+	choosen_path := re_run(tm, ls_name_list, pos)
+	show_cursor()
+
+	if err != nil {
+		log.Fatal(err)
+		panic("Failed to get working directory")
+	}
+
+	joined_path := path.Join(first_arg, choosen_path)
+
+	clear()
+	println(">> ", first_arg)
+	println(">> ", choosen_path)
+	os.Stdout.Write([]byte(joined_path))
+
+	return
 }
 
 func render_list(list []string, pos int) {
-	for line_pos, line := range list {
+	const SIZE = 5
+
+	var new_list []string
+	list_len := len(list)
+	// println("pos: ", pos, len(list))
+
+	var new_pos = pos
+
+	if list_len <= SIZE {
+		new_list = list
+	} else if pos > SIZE-1 {
+		new_list = list[pos-SIZE+1 : pos+1]
+		pos = len(new_list) - 1
+	} else {
+		new_list = list[0:SIZE]
+	}
+
+	for line_pos, line := range new_list {
 		if line_pos == pos {
-			println("→ ", line)
+			println("\033[38;5;220m → ", line, "\033[38;5;231m")
 		} else {
 			println(" ", line)
 		}
 	}
+
+	println(new_pos+1, "/", list_len)
 }
 
 func clear() {
-
-	// print("\033[6n")
-
 	print("\033[0;0H\033[2J")
-	// print("\033[H\033[2J")
 }
 
-func nice_bytes(bytes_list []byte) (string, bool) {
-	if len(bytes_list) != 3 {
-		println("not long enough")
-		return "", false
-	}
-
-	// esc 27 = ESC
-	// b_braket 91 = [
-	// val ? = ?
-	esc, b_braket, val := bytes_list[0], bytes_list[1], bytes_list[2]
-
-	if esc != 27 || b_braket != 91 {
-		println("proper no escape sequence")
-		return "", false
-	}
-
-	val_string := string(val)
-
-	switch val_string {
-	case "A":
-		return "Up", true
-	case "B":
-		return "Down", true
-	case "C":
-		return "Left", true
-	case "D":
-		return "Right", true
-	case "Z":
-		return "<Shift>Tab", true
-	default:
-		return "", false
-	}
-
-	// return string(val), true
+// make cursor invisible
+func hide_cursor() {
+	println("\033[?25l")
 }
 
-func get_nice_key_val(key string) int {
+// make cursor visible
+func show_cursor() {
+	println("\033[?25h")
+}
 
-	nice_key_map := make(map[string]int)
-	nice_key_map["<Shift>Tab"] = -1
-	nice_key_map["Up"] = -1
-	nice_key_map["Down"] = 1
-	nice_key_map["Left"] = 0
-	nice_key_map["Right"] = 0
+func handle_termination() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for range c {
+			// log.Printf("captured %v, stopping profiler and exiting..", sig)
+			show_cursor()
+			os.Exit(0)
+			return
+		}
+	}()
 
-	return nice_key_map[key]
-
-	// return 0
 }
