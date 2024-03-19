@@ -1,13 +1,16 @@
 #!/bin/bash
 
 lsx() {
-    echo "message"
-    if [ -z "$1" ]; then
-        echo "No directory path provided"
-        exit 2
-    else
-        echo "$1"
-        p=$($HOME/.lsx/main $1)
-        cd $p
+    LSX_CD_PATH=$1
+
+    if [ -z "$LSX_CD_PATH" ]; then
+        LSX_CD_PATH="."
     fi
+
+    echo "$LSX_CD_PATH"
+    LSX_FOUND_PATH=$($HOME/.lsx/main $LSX_CD_PATH)
+
+    # check that lsx bin exited with 0 as error code
+
+    cd $LSX_FOUND_PATH
 }
