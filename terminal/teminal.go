@@ -7,10 +7,10 @@ import (
 	"os/exec"
 )
 
-type TerminalReader struct {
+type Terminal_reader struct {
 }
 
-func (tr TerminalReader) Reader() {
+func (tr Terminal_reader) Reader() (Key, error) {
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
 	exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
@@ -25,18 +25,20 @@ func (tr TerminalReader) Reader() {
 			if item == 0 {
 				continue
 			}
-			fmt.Printf(">>> %v %q %T\n", item, string(item), item)
-
+			// fmt.Printf(">>> %v %q %T\n", item, string(item), item)
 			formattedByte = append(formattedByte, item)
 		}
 
-		println("lenght", len(formattedByte))
+		// println("lenght", len(formattedByte))
 
 		if len(formattedByte) == 1 {
-			println("|>", string(formattedByte))
+			return newKey(formattedByte[0]), nil
 		} else {
-			// println("hot key")
-			hotKeys(b)
+			if k, err := hotKeys(formattedByte); err == nil {
+				return k, err
+			} else {
+				println("Not supported hot key")
+			}
 		}
 
 		clear(b)
@@ -49,14 +51,23 @@ type Key struct {
 	alt         bool
 	esc         bool
 	payload     string
-	payloadByte byte
+	PayloadByte byte
+	desc        string
 }
 
-func (k Key) toStrint() string {
-	return fmt.Sprintln("\nshift", k.shift, "\nctrl", k.ctrl, "\nalt", k.alt, "\nesc", k.esc, "\npayload", k.payload, "\npayloadByte", k.payloadByte)
+func (k Key) To_string() string {
+	return fmt.Sprintln(k)
 }
 
-func hotKeys(keys []byte) {
+func newKey(b byte) Key {
+	k := new(Key)
+
+	k.payload = fmt.Sprintf("%q", string(b))
+	k.PayloadByte = b
+	return *k
+}
+
+func hotKeys(keys []byte) (Key, error) {
 
 	var cleanKeys []byte
 
@@ -66,18 +77,14 @@ func hotKeys(keys []byte) {
 		}
 	}
 
-	if len(cleanKeys) == 3 {
-		println("hot keys")
-		if k, err := buildHotkey(cleanKeys); err == nil {
-			println("hk > ", k.toStrint())
-		}
-	} else if len(cleanKeys) > 3 {
-		println("extra hot keys")
-		if k, err := buildExtraHotkey(cleanKeys); err == nil {
-			println("ehk > ", k.toStrint())
-		}
+	ckLen := len(cleanKeys)
+
+	if ckLen == 3 {
+		return buildHotkey(cleanKeys)
+	} else if ckLen == 6 {
+		return buildExtraHotkey(cleanKeys)
 	} else {
-		println("not a hot key")
+		return *new(Key), errors.New("No hot keys")
 	}
 }
 
@@ -101,6 +108,10 @@ func checkHotkey(keys []byte, checkExtra bool) (int, error) {
 
 	if !checkExtra {
 		return 1, nil
+	}
+
+	if len(keys) != 6 {
+		return 0, errors.New("Invaild key sequence(Not allowed)")
 	}
 
 	if keys[1] != 91 {
@@ -128,7 +139,11 @@ func buildHotkey(keys []byte) (Key, error) {
 
 	keyValue := string(keys[2])
 
-	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, payloadByte: keys[2]}
+	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, PayloadByte: keys[2]}
+
+	if nav := basicNav[keys[2]]; nav != nil {
+		key.desc = nav[1]
+	}
 
 	return *key, nil
 }
@@ -137,20 +152,20 @@ func buildExtraHotkey(keys []byte) (Key, error) {
 
 	key := new(Key)
 
-	if _, err := checkHotkey(keys, false); err != nil {
+	if _, err := checkHotkey(keys, true); err != nil {
 		return *key, err
 	}
 
 	meta := metaKey[keys[4]]
 
-	println("META ====", keys[4], meta)
+	// println("META ====", keys[4], meta)
 
 	keyValue := string(keys[5])
 
-	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, payloadByte: keys[2]}
+	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, PayloadByte: keys[2]}
 
 	for _, m := range meta {
-		println("meta", m, m == "shift")
+		// println("meta", m, m == "shift")
 
 		if m == "shift" {
 			key.shift = true
@@ -175,17 +190,28 @@ func buildExtraHotkey(keys []byte) (Key, error) {
 // C = right
 // D = left
 // Z = tab (actually shift tab)
-var basicNav = map[int]string{
-	65: "A",
-	66: "B",
-	67: "C",
-	68: "D",
-	90: "Z",
+var basicNav = map[byte][]string{
+	65: {"A", "Up"},
+	66: {"B", "Down"},
+	67: {"C", "Right"},
+	68: {"D", "Left"},
+	10: {"\n", "Enter"},
+	9:  {"\t", "Tab"},
+	90: {"Z", "Shift+Tab"},
+}
+
+var basicNavValue = map[byte]int{
+	65: -1, //{"A", "Up"},
+	66: 1,  //{"B", "Down"},
+	67: 0,  //{"C", "Right"},
+	68: 0,  //{"D", "Left"},
+	10: 0,  //{"\n", "Enter"},
+	9:  0,  //{"\t", "Tab"},
+	90: 0,  //{"Z", "Shift+Tab"},
 }
 
 // ESC [ <key|1> ; <meta_key> <key>
 // the second part (from ;) only happens when we get 1 and not a key value
-
 var metaKey = map[byte][]string{
 	50: {"shift"},
 	51: {"alt"},
@@ -193,9 +219,3 @@ var metaKey = map[byte][]string{
 	53: {"ctrl"},
 	54: {"ctrl", "shift"},
 }
-
-// 2 = shift
-// 5 = ctrl
-// 3 = alt
-// 6 = ctrl + shift
-// 4 = shift + alt
