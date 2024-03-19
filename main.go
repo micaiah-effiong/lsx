@@ -2,18 +2,19 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
 	"os/signal"
 	"path"
-	"strings"
 	"syscall"
 
+	"github.com/micaiah-effiong/lsx/render"
 	"github.com/micaiah-effiong/lsx/terminal"
 )
 
-func re_run(tm terminal.Terminal_reader, ls_name_list []string, pos int) string {
+func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, pos int) string {
 
 	render_list(ls_name_list, pos)
 	k, err := tm.Reader()
@@ -26,7 +27,7 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []string, pos int) string 
 	// fmt.Println(k.To_string())
 
 	if k.PayloadByte == 10 {
-		return ls_name_list[pos]
+		return ls_name_list[pos].Name
 	}
 
 	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(ls_name_list)-1)
@@ -49,10 +50,6 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	// for _, arg := range args {
-	// 	println("all args ", arg)
-	// }
-
 	var first_arg string
 
 	if len(args) < 1 {
@@ -61,50 +58,36 @@ func main() {
 		first_arg = args[0]
 	}
 
-	// if first_arg == "~" {
-	// 	home_dir, err := os.UserHomeDir()
-	// 	if err != nil {
-	// 		print(err)
-	// 		print("Error getting user home directory")
-	// 		// panic("An error occurred while reading directory")
-	// 	}
-	//
-	// 	first_arg = home_dir
-	// }
-
 	_fs := os.DirFS(first_arg)
 	ls, err := fs.ReadDir(_fs, ".")
 
 	if err != nil {
 		print(err)
-		print("No such file or directory")
+		log.Fatal("No such file or directory")
 		// panic("An error occurred while reading directory")
+
+		os.Exit(1)
+		return
 	}
 
 	clear()
 
 	pos := 0
-	var ls_name_list []string
+	var ls_name_list []render.Entry
 
 	for _, dir_list_item := range ls {
-		info, err := dir_list_item.Info()
+
+		entry, err := render.MakeEntry(dir_list_item)
 
 		if err != nil {
 			continue
 		}
 
-		if strings.HasPrefix(info.Name(), ".") {
+		if entry.IsDotEntry {
 			continue
 		}
 
-		var name string
-		// if info.IsDir() {
-		// 	name = "\033[38;5;112m" + info.Name() + "\033[38;5;231m"
-		// } else {
-		name = dir_list_item.Name()
-		// }
-
-		ls_name_list = append(ls_name_list, name)
+		ls_name_list = append(ls_name_list, entry)
 	}
 
 	tm := terminal.Terminal_reader{}
@@ -114,25 +97,18 @@ func main() {
 	choosen_path := re_run(tm, ls_name_list, pos)
 	show_cursor()
 
-	if err != nil {
-		log.Fatal(err)
-		panic("Failed to get working directory")
-	}
-
 	joined_path := path.Join(first_arg, choosen_path)
 
 	clear()
-	println(">> ", first_arg)
-	println(">> ", choosen_path)
 	os.Stdout.Write([]byte(joined_path))
 
 	return
 }
 
-func render_list(list []string, pos int) {
+func render_list(list []render.Entry, pos int) {
 	const SIZE = 5
 
-	var new_list []string
+	var new_list []render.Entry
 	list_len := len(list)
 	// println("pos: ", pos, len(list))
 
@@ -149,13 +125,13 @@ func render_list(list []string, pos int) {
 
 	for line_pos, line := range new_list {
 		if line_pos == pos {
-			println("\033[38;5;220m → ", line, "\033[38;5;231m")
+			println("\033[38;5;220m → ", line.RenderName, "\033[38;5;231m")
 		} else {
-			println(" ", line)
+			println(" ", line.RenderName)
 		}
 	}
 
-	println(new_pos+1, "/", list_len)
+	println(fmt.Sprintf("%v/%v", new_pos+1, list_len))
 }
 
 func clear() {
@@ -175,13 +151,14 @@ func show_cursor() {
 func handle_termination() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
 	go func() {
 		for range c {
 			// log.Printf("captured %v, stopping profiler and exiting..", sig)
 			show_cursor()
+			clear()
 			os.Exit(0)
 			return
 		}
 	}()
-
 }
