@@ -1,7 +1,7 @@
 package terminal
 
 func GetNavKeyCalculatedValue(key Key, pos int, size int) int {
-	val := getNavKeyValue(key)
+	val := get_nav_key_value(key)
 
 	if (val + pos) > size {
 		pos = size
@@ -14,7 +14,7 @@ func GetNavKeyCalculatedValue(key Key, pos int, size int) int {
 	return pos
 }
 
-func getNavKeyValue(k Key) int {
+func get_nav_key_value(k Key) int {
 	if k.alt || k.ctrl || k.shift {
 		return 0
 	}
