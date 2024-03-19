@@ -131,14 +131,14 @@ func checkHotkey(keys []byte, checkExtra bool) (int, error) {
 
 func buildHotkey(keys []byte) (Key, error) {
 
-	key := new(Key)
-
 	if _, err := checkHotkey(keys, false); err != nil {
-		return *key, err
+		var key Key
+		return key, err
 	}
 
 	keyValue := string(keys[2])
 
+	key := new(Key)
 	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, PayloadByte: keys[2]}
 
 	if nav := basicNav[keys[2]]; nav != nil {
@@ -150,10 +150,9 @@ func buildHotkey(keys []byte) (Key, error) {
 
 func buildExtraHotkey(keys []byte) (Key, error) {
 
-	key := new(Key)
-
 	if _, err := checkHotkey(keys, true); err != nil {
-		return *key, err
+		var key Key
+		return key, err
 	}
 
 	meta := metaKey[keys[4]]
@@ -162,6 +161,7 @@ func buildExtraHotkey(keys []byte) (Key, error) {
 
 	keyValue := string(keys[5])
 
+	key := new(Key)
 	key = &Key{alt: false, ctrl: false, esc: true, payload: keyValue, PayloadByte: keys[2]}
 
 	for _, m := range meta {
