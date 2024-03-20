@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -12,12 +13,14 @@ type Terminal_reader struct {
 
 func (tr Terminal_reader) Reader() (Key, error) {
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	// do not display entered characters on the screen
+	// // do not display entered characters on the screen
 	exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
 
-	var b []byte = make([]byte, 10)
-	for {
-		os.Stdin.Read(b)
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Split(Split)
+
+	for scanner.Scan() {
+		b := scanner.Bytes()
 
 		var formattedByte []byte
 
@@ -41,8 +44,11 @@ func (tr Terminal_reader) Reader() (Key, error) {
 			}
 		}
 
-		clear(b)
+		// clear(b)
 	}
+
+	var k Key
+	return k, errors.New("No valid input")
 }
 
 type Key struct {
@@ -55,8 +61,12 @@ type Key struct {
 	desc        string
 }
 
-func (k Key) To_string() string {
+func (k Key) ToString() string {
 	return fmt.Sprintln(k)
+}
+
+func (k Key) IsHotKey() bool {
+	return k.esc
 }
 
 func newKey(b byte) Key {
@@ -218,4 +228,14 @@ var metaKey = map[byte][]string{
 	52: {"shift", "alt"},
 	53: {"ctrl"},
 	54: {"ctrl", "shift"},
+}
+
+// type SplitFunc func(data []byte, atEOF bool) (advance int, token []byte, err error)
+func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
+
+	if len(data) <= 10 && len(data) > 0 {
+		return len(data), data, nil
+	}
+
+	return 0, nil, errors.New("No valid input")
 }
