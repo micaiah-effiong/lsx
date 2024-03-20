@@ -8,15 +8,32 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strings"
 	"syscall"
 
 	"github.com/micaiah-effiong/lsx/render"
 	"github.com/micaiah-effiong/lsx/terminal"
 )
 
-func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, pos int) string {
+func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_list []render.Entry, pos int, search_str string) string {
 
-	render_list(ls_name_list, pos)
+	println(fmt.Sprintf("Search: %v \n", search_str))
+
+	var _searched_list []render.Entry
+	if search_str != "" {
+		for _, entry := range ls_name_list {
+			if strings.Contains(strings.ToLower(entry.Name), strings.ToLower(search_str)) {
+				_searched_list = append(_searched_list, entry)
+			}
+		}
+	} else {
+		_searched_list = ls_name_list
+	}
+
+	searched_list = _searched_list
+
+	render_list(searched_list, pos)
+
 	k, err := tm.Reader()
 	if err != nil {
 		panic(err)
@@ -24,15 +41,31 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, pos int) s
 
 	clear()
 
-	// fmt.Println(k.To_string())
-
 	if k.PayloadByte == 10 {
-		return ls_name_list[pos].Name
+		return searched_list[pos].Name
 	}
 
-	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(ls_name_list)-1)
+	// println(k.ToString())
 
-	return re_run(tm, ls_name_list, new_pos)
+	formatted_search_str := search_str
+	if !k.IsHotKey() {
+		formatted_search_str += string(k.PayloadByte)
+	}
+
+	if k.PayloadByte == 127 && !k.IsHotKey() { // backspace
+		fstr_len := len(formatted_search_str)
+		if fstr_len > 1 {
+			formatted_search_str = formatted_search_str[:fstr_len-2]
+		}
+
+		if fstr_len == 1 {
+			formatted_search_str = ""
+		}
+	}
+
+	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(searched_list)-1)
+
+	return re_run(tm, ls_name_list, searched_list, new_pos, formatted_search_str)
 }
 
 // func main() {
@@ -94,7 +127,7 @@ func main() {
 
 	hide_cursor()
 	clear()
-	choosen_path := re_run(tm, ls_name_list, pos)
+	choosen_path := re_run(tm, ls_name_list, make([]render.Entry, 0), pos, "")
 	show_cursor()
 
 	joined_path := path.Join(first_arg, choosen_path)
