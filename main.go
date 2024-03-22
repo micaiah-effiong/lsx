@@ -39,7 +39,7 @@ func main() {
 		first_arg = args[0]
 	}
 
-	ls, err := get_path_entries(first_arg)
+	ls, err := terminal.GetPathEntries(first_arg)
 
 	if err != nil {
 		os.Exit(1)
@@ -88,32 +88,6 @@ func handle_termination() {
 			return
 		}
 	}()
-}
-
-func get_path_entries(path string) ([]render.Entry, error) {
-	file_system := os.DirFS(path)
-	ls, err := fs.ReadDir(file_system, ".")
-
-	if err != nil {
-		print(err)
-		log.Fatal("No such file or directory")
-
-		return nil, errors.New("No such file or directory")
-	}
-
-	var render_entries []render.Entry
-
-	for _, dir_list_item := range ls {
-		entry, err := render.MakeEntry(dir_list_item)
-
-		if err != nil || entry.IsDotEntry {
-			continue
-		}
-
-		render_entries = append(render_entries, entry)
-	}
-
-	return render_entries, nil
 }
 
 func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_list []render.Entry, pos int, search_str string) string {
