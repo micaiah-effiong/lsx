@@ -2,13 +2,16 @@ package terminal
 
 func GetNavKeyCalculatedValue(key Key, pos int, size int) int {
 	val := get_nav_key_value(key)
+	assm := val + pos
 
-	if (val + pos) > size {
-		pos = size
-	} else if (val + pos) < 0 {
+	size_indexing := size - 1
+
+	if assm > size_indexing {
+		pos = max(size_indexing, 0)
+	} else if assm < 0 {
 		pos = 0
 	} else {
-		pos += val
+		pos = assm
 	}
 
 	return pos

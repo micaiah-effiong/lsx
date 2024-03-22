@@ -165,7 +165,7 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_l
 		}
 	}
 
-	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(searched_list)-1)
+	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(searched_list))
 
 	return re_run(tm, ls_name_list, searched_list, new_pos, formatted_search_str)
 }
