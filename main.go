@@ -1,11 +1,8 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
-	"log"
 	"os"
 	"os/signal"
 	"path"
