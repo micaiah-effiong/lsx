@@ -143,7 +143,10 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_l
 
 	clear()
 
-	if k.PayloadByte == 10 {
+	if k.PayloadByte == 10 { // <Enter>
+		if len(searched_list) <= 0 {
+			return ""
+		}
 		return searched_list[pos].Name
 	}
 
