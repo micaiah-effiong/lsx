@@ -62,35 +62,6 @@ func main() {
 	return
 }
 
-func render_list(list []render.Entry, pos int) {
-	const SIZE = 5
-
-	var new_list []render.Entry
-	list_len := len(list)
-	// println("pos: ", pos, len(list))
-
-	var new_pos = pos
-
-	if list_len <= SIZE {
-		new_list = list
-	} else if pos > SIZE-1 {
-		new_list = list[pos-SIZE+1 : pos+1]
-		pos = len(new_list) - 1
-	} else {
-		new_list = list[0:SIZE]
-	}
-
-	for line_pos, line := range new_list {
-		if line_pos == pos {
-			println("\033[38;5;220m → ", line.RenderName, "\033[38;5;231m")
-		} else {
-			println(" ", line.RenderName)
-		}
-	}
-
-	println(fmt.Sprintf("%v/%v", new_pos+1, list_len))
-}
-
 func clear() {
 	print("\033[0;0H\033[2J")
 }
@@ -162,8 +133,8 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_l
 	}
 
 	searched_list = _searched_list
-
-	render_list(searched_list, pos)
+	max_render_size := 5
+	render.RenderList(searched_list, pos, max_render_size)
 
 	k, err := tm.Reader()
 	if err != nil {
