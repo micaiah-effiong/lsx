@@ -50,7 +50,6 @@ func main() {
 	tm := terminal.Terminal_reader{}
 
 	hide_cursor()
-	clear()
 	choosen_path := re_run(tm, ls, make([]render.Entry, 0), pos, "")
 	show_cursor()
 
@@ -119,6 +118,7 @@ func get_path_entries(path string) ([]render.Entry, error) {
 
 func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_list []render.Entry, pos int, search_str string) string {
 
+	clear()
 	println(fmt.Sprintf("Search: %v \n", search_str))
 
 	var _searched_list []render.Entry
