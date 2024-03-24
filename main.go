@@ -25,6 +25,9 @@ func main() {
 
 	handle_termination()
 
+	a_flag := flag.Bool("a", false, "")
+	s_flag := flag.Int("s", 5, "")
+
 	flag.Parse()
 	args := flag.Args()
 
@@ -38,7 +41,8 @@ func main() {
 
 	tm := terminal.Terminal_reader{}
 
-	config := LsxConfig{tm, first_arg, 0}
+	config_flags := map[string]int{"s": *s_flag, "a": bool2Int(*a_flag)}
+	config := LsxConfig{tm, first_arg, 0, *s_flag, config_flags}
 	choosen_path := find_lsx_path(config)
 
 	clear()
@@ -94,8 +98,7 @@ func render_get_choice(config LsxConfig, ls_name_list []render.Entry, searched_l
 	}
 
 	searched_list = filtered_searched_list
-	max_render_size := 5
-	render.RenderList(searched_list, config.Position, max_render_size)
+	render.RenderList(searched_list, config.Position, config.ListSize)
 
 	k, err := config.Terminal.Reader()
 	if err != nil {
@@ -146,7 +149,7 @@ func render_get_choice(config LsxConfig, ls_name_list []render.Entry, searched_l
 
 func find_lsx_path(config LsxConfig) string {
 
-	ls, err := terminal.GetPathEntries(config.SearchPath)
+	ls, err := terminal.GetPathEntries(config.SearchPath, config.Flags["a"] != 0)
 
 	if err != nil {
 		os.Exit(1)
@@ -165,6 +168,8 @@ type LsxConfig struct {
 	Terminal   terminal.Terminal_reader
 	SearchPath string
 	Position   int
+	ListSize   int
+	Flags      map[string]int
 }
 
 func handle_list_tab(config LsxConfig, choice_item string) string {
@@ -173,4 +178,11 @@ func handle_list_tab(config LsxConfig, choice_item string) string {
 	config.Position = 0
 	println("tab-into:", config.SearchPath, choice_item, joined_path)
 	return find_lsx_path(config)
+}
+
+func bool2Int(n bool) int {
+	if n {
+		return 1
+	}
+	return 0
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/micaiah-effiong/lsx/render"
 )
 
-func GetPathEntries(path string) ([]render.Entry, error) {
+func GetPathEntries(path string, allowDot bool) ([]render.Entry, error) {
 	file_system := os.DirFS(path)
 	ls, err := fs.ReadDir(file_system, ".")
 
@@ -25,7 +25,11 @@ func GetPathEntries(path string) ([]render.Entry, error) {
 	for _, dir_list_item := range ls {
 		entry, err := render.MakeEntry(dir_list_item)
 
-		if err != nil || entry.IsDotEntry {
+		if err != nil {
+			continue
+		}
+
+		if entry.IsDotEntry && !allowDot {
 			continue
 		}
 
