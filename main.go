@@ -36,24 +36,13 @@ func main() {
 		first_arg = args[0]
 	}
 
-	ls, err := terminal.GetPathEntries(first_arg)
-
-	if err != nil {
-		os.Exit(1)
-		return
-	}
-
-	pos := 0
 	tm := terminal.Terminal_reader{}
 
-	hide_cursor()
-	choosen_path := re_run(tm, ls, make([]render.Entry, 0), pos, "")
-	show_cursor()
-
-	joined_path := path.Join(first_arg, choosen_path)
+	config := LsxConfig{tm, first_arg, 0}
+	choosen_path := find_lsx_path(config)
 
 	clear()
-	os.Stdout.Write([]byte(joined_path))
+	os.Stdout.Write([]byte(choosen_path))
 
 	return
 }
@@ -87,38 +76,49 @@ func handle_termination() {
 	}()
 }
 
-func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_list []render.Entry, pos int, search_str string) string {
+func render_get_choice(config LsxConfig, ls_name_list []render.Entry, searched_list []render.Entry, search_str string) string {
 
 	clear()
+	println(config.SearchPath)
 	println(fmt.Sprintf("Search: %v \n", search_str))
 
-	var _searched_list []render.Entry
+	var filtered_searched_list []render.Entry
 	if search_str != "" {
 		for _, entry := range ls_name_list {
 			if strings.Contains(strings.ToLower(entry.Name), strings.ToLower(search_str)) {
-				_searched_list = append(_searched_list, entry)
+				filtered_searched_list = append(filtered_searched_list, entry)
 			}
 		}
 	} else {
-		_searched_list = ls_name_list
+		filtered_searched_list = ls_name_list
 	}
 
-	searched_list = _searched_list
+	searched_list = filtered_searched_list
 	max_render_size := 5
-	render.RenderList(searched_list, pos, max_render_size)
+	render.RenderList(searched_list, config.Position, max_render_size)
 
-	k, err := tm.Reader()
+	k, err := config.Terminal.Reader()
 	if err != nil {
 		panic(err)
 	}
 
 	clear()
 
+	if k.PayloadByte == 9 && len(searched_list) > 0 { // tab
+		choice_item := searched_list[config.Position].Name
+		return handle_list_tab(config, choice_item)
+	}
+
+	if k.PayloadByte == 90 && k.IsHotKey() { // shift+tab
+		return handle_list_tab(config, "..")
+	}
+
 	if k.PayloadByte == 10 { // <Enter>
 		if len(searched_list) <= 0 {
 			return ""
 		}
-		return searched_list[pos].Name
+		choice_item := searched_list[config.Position].Name
+		return path.Join(config.SearchPath, choice_item)
 	}
 
 	// println(k.ToString())
@@ -139,7 +139,38 @@ func re_run(tm terminal.Terminal_reader, ls_name_list []render.Entry, searched_l
 		}
 	}
 
-	new_pos := terminal.GetNavKeyCalculatedValue(k, pos, len(searched_list))
+	config.Position = terminal.GetNavKeyCalculatedValue(k, config.Position, len(searched_list))
 
-	return re_run(tm, ls_name_list, searched_list, new_pos, formatted_search_str)
+	return render_get_choice(config, ls_name_list, searched_list, formatted_search_str)
+}
+
+func find_lsx_path(config LsxConfig) string {
+
+	ls, err := terminal.GetPathEntries(config.SearchPath)
+
+	if err != nil {
+		os.Exit(1)
+		return ""
+	}
+
+	hide_cursor()
+	choosen_path := render_get_choice(config, ls, make([]render.Entry, 0), "")
+	show_cursor()
+
+	return choosen_path
+	// return path.Join(config.SearchPath, choosen_path)
+}
+
+type LsxConfig struct {
+	Terminal   terminal.Terminal_reader
+	SearchPath string
+	Position   int
+}
+
+func handle_list_tab(config LsxConfig, choice_item string) string {
+	joined_path := path.Join(config.SearchPath, choice_item)
+	config.SearchPath = joined_path
+	config.Position = 0
+	println("tab-into:", config.SearchPath, choice_item, joined_path)
+	return find_lsx_path(config)
 }
